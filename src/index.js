@@ -151,6 +151,8 @@ async function startBot(attempt) {
         headless:        'new',
         logQR:           true,
         autoClose:       0,
+        waitForLogin:    90000,
+        createPathFileToken: true,
         forceLogin:      true,
         disableWelcome:  true,
         updatesLog:      false,
@@ -165,6 +167,8 @@ async function startBot(attempt) {
           '--disable-sync',
           '--hide-scrollbars',
           '--mute-audio',
+          '--disable-dev-shm-usage',
+          '--shm-size=1gb',
           // ← THE KEY FIX: isolated Chrome profile = no cached WhatsApp session
 
         ],
