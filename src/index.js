@@ -120,7 +120,7 @@ async function main() {
 
   const venomOptions = {
     folderNameToken: config.session.folder,
-    headless: true,
+    headless: 'new',
     logQR: false,
     autoClose: 0,
     disableWelcome: true,

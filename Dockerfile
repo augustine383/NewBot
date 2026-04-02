@@ -2,11 +2,10 @@
 FROM node:20-slim
 
 # ── Chromium + all Venom-Bot/Puppeteer dependencies ───────────────
-# node:20-slim uses Debian bookworm — libasound2 → libasound2t64
 RUN apt-get update && apt-get install -y \
     chromium \
     fonts-liberation \
-    libasound2t64 \
+    libasound2 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
     libcups2 \
