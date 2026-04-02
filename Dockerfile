@@ -1,7 +1,7 @@
-# ── Base ──────────────────────────────────────────────────────────
+# ── Base image ────────────────────────────────────────────────────
 FROM node:20-slim
 
-# ── Chromium + all Venom-Bot/Puppeteer dependencies ───────────────
+# ── Install Chromium + dependencies for Venom-Bot ─────────────────
 RUN apt-get update && apt-get install -y \
     chromium \
     fonts-liberation \
@@ -19,38 +19,29 @@ RUN apt-get update && apt-get install -y \
     libxdamage1 \
     libxfixes3 \
     libxrandr2 \
-    libxshmfence1 \
     xdg-utils \
-    ca-certificates \
     wget \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# ── Puppeteer — use system Chromium, skip bundled download ────────
+# ── Tell Puppeteer/Venom-Bot to use system Chromium ───────────────
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV NODE_ENV=production
-ENV RENDER=true
 
-# ── Working directory ─────────────────────────────────────────────
+# ── App setup ─────────────────────────────────────────────────────
 WORKDIR /app
 
-# ── Install dependencies first (layer cache) ─────────────────────
 COPY package*.json ./
 RUN npm install --omit=dev
 
-# ── Copy source ───────────────────────────────────────────────────
 COPY . .
 
-# ── Runtime folders ───────────────────────────────────────────────
+# Create required folders
 RUN mkdir -p tokens logs
 
-# ── Port (Render injects PORT automatically) ──────────────────────
+# ── Expose port (Render sets PORT automatically) ──────────────────
 EXPOSE 10000
-
-# ── Healthcheck so Render knows the container is alive ────────────
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD wget -qO- http://localhost:${PORT:-10000}/health || exit 1
 
 # ── Start ─────────────────────────────────────────────────────────
 CMD ["node", "src/index.js"]
