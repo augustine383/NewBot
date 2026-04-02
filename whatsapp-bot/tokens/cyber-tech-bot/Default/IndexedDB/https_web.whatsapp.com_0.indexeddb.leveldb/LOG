@@ -1,0 +1,26 @@
+2026/04/01-10:42:46.921 1a90 Reusing MANIFEST C:\Users\TGNE\Desktop\newbot\whatsapp-bot\tokens\cyber-tech-bot\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/04/01-10:42:46.922 1a90 Recovering log #143
+2026/04/01-10:42:47.131 1a90 Reusing old log C:\Users\TGNE\Desktop\newbot\whatsapp-bot\tokens\cyber-tech-bot\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/000143.log 
+2026/04/01-10:43:01.901 1a90 Level-0 table #154: started
+2026/04/01-10:43:02.234 1a90 Level-0 table #154: 1274430 bytes OK
+2026/04/01-10:43:02.308 1a90 Delete type=0 #143
+2026/04/01-10:43:02.513 1a90 Compacting 1@1 + 9@2 files
+2026/04/01-10:43:03.237 1a90 Generated table #155@1: 43798 keys, 2207182 bytes
+2026/04/01-10:43:03.687 1a90 Generated table #156@1: 18908 keys, 2169261 bytes
+2026/04/01-10:43:04.046 1a90 Generated table #157@1: 1433 keys, 2137390 bytes
+2026/04/01-10:43:04.704 1a90 Generated table #158@1: 15272 keys, 2197178 bytes
+2026/04/01-10:43:05.316 1a90 Generated table #159@1: 21451 keys, 2155298 bytes
+2026/04/01-10:43:09.039 1a90 Generated table #160@1: 94351 keys, 2243140 bytes
+2026/04/01-10:43:09.863 1a90 Generated table #161@1: 58385 keys, 1489504 bytes
+2026/04/01-10:43:09.864 1a90 Compacted 1@1 + 9@2 files => 14598953 bytes
+2026/04/01-10:43:09.930 1a90 compacted to: files[ 0 0 7 0 0 0 0 ]
+2026/04/01-10:43:09.931 1a90 Delete type=2 #100
+2026/04/01-10:43:09.931 1a90 Delete type=2 #133
+2026/04/01-10:43:09.932 1a90 Delete type=2 #145
+2026/04/01-10:43:09.932 1a90 Delete type=2 #146
+2026/04/01-10:43:09.933 1a90 Delete type=2 #147
+2026/04/01-10:43:09.933 1a90 Delete type=2 #148
+2026/04/01-10:43:09.933 1a90 Delete type=2 #149
+2026/04/01-10:43:09.933 1a90 Delete type=2 #150
+2026/04/01-10:43:09.933 1a90 Delete type=2 #151
+2026/04/01-10:43:09.933 1a90 Delete type=2 #154

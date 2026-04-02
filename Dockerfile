@@ -1,47 +1,47 @@
-# Mutistaged Node.js Build
-FROM node:10-alpine as builder
+# ── Base image ────────────────────────────────────────────────────
+FROM node:20-slim
 
-# Install system dependencies
-RUN set -ex; \
-    apk add --update --no-cache \
-    make gcc g++ git python
+# ── Install Chromium + dependencies for Venom-Bot ─────────────────
+RUN apt-get update && apt-get install -y \
+    chromium \
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libcups2 \
+    libdbus-1-3 \
+    libgbm1 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libx11-xcb1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    xdg-utils \
+    wget \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy package.json dependencies
-COPY server/package.json /app/server/package.json
-COPY server/package-lock.json /app/server/package-lock.json
-COPY client/package.json /app/client/package.json
-COPY client/package-lock.json /app/client/package-lock.json
-COPY shared/package.json /app/shared/package.json
-COPY shared/package-lock.json /app/shared/package-lock.json
-COPY zone-mta/package.json /app/zone-mta/package.json
-COPY zone-mta/package-lock.json /app/zone-mta/package-lock.json
+# ── Tell Puppeteer/Venom-Bot to use system Chromium ───────────────
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV NODE_ENV=production
 
-# Install dependencies in each directory
-RUN cd /app/client && npm install
-RUN cd /app/shared && npm install --production
-RUN cd /app/server && npm install --production
-RUN cd /app/zone-mta && npm install --production
+# ── App setup ─────────────────────────────────────────────────────
+WORKDIR /app
 
-# Later, copy the app files. That improves development speed as building the Docker image will not have
-# to download and install all the NPM dependencies every time there's a change in the source code
-COPY . /app
+COPY package*.json ./
+RUN npm install --omit=dev
 
-RUN set -ex; \
-   cd /app/client && \
-   npm run build && \
-   rm -rf node_modules
+COPY . .
 
-# Final Image
-FROM node:10-alpine
+# Create required folders
+RUN mkdir -p tokens logs
 
-WORKDIR /app/
+# ── Expose port (Render sets PORT automatically) ──────────────────
+EXPOSE 10000
 
-# Install system dependencies
-RUN set -ex; \
-    apk add --update --no-cache \
-    pwgen netcat-openbsd bash imagemagick
-
-COPY --from=builder /app/ /app/
-
-EXPOSE 3000 3003 3004
-ENTRYPOINT ["bash", "/app/docker-entrypoint.sh"]
+# ── Start ─────────────────────────────────────────────────────────
+CMD ["node", "src/index.js"]
