@@ -1,9 +1,10 @@
-**/node_modules/
-docs/
-Dockerfile
-*.md
+﻿node_modules
+.env
+tokens
+logs
 .git
 .gitignore
-.gitmodules
-docker-compose.yml
-docker-compose-local.yml
+*.md
+.venv
+__pycache__
+*.pyc
