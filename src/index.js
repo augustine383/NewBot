@@ -125,7 +125,7 @@ async function startBot(attempt) {
     logger.info('🚀 Starting WhatsApp...');
 
     const client = await venom.create(
-      'newbot-session',
+      process.env.SESSION_NAME || 'cyber-tech-bot',
       (qr) => {
         QR_DATA   = qr;
         CONNECTED = false;
