@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>WhatsApp Bot Admin</title>
+<style>
+  :root {
+    --green: #25d366; --green-dark: #128c7e; --green-light: #dcf8c6;
+    --bg: #f0f2f5; --white: #fff; --text: #1a1a2e; --muted: #6b7280;
+    --danger: #ef4444; --warn: #f59e0b; --info: #3b82f6;
+    --radius: 12px; --shadow: 0 2px 12px rgba(0,0,0,.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ── Layout ── */
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: 240px; background: var(--green-dark); color: #fff;
+             display: flex; flex-direction: column; flex-shrink: 0; }
+  .sidebar-logo { padding: 24px 20px; border-bottom: 1px solid rgba(255,255,255,.15); }
+  .sidebar-logo h1 { font-size: 16px; font-weight: 700; }
+  .sidebar-logo p  { font-size: 12px; opacity: .7; margin-top: 2px; }
+  .sidebar-nav { flex: 1; padding: 12px 0; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 12px 20px;
+              cursor: pointer; font-size: 14px; transition: background .15s;
+              border-left: 3px solid transparent; }
+  .nav-item:hover  { background: rgba(255,255,255,.1); }
+  .nav-item.active { background: rgba(255,255,255,.15); border-left-color: var(--green); font-weight: 600; }
+  .nav-icon { font-size: 18px; }
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .topbar { background: var(--white); padding: 0 28px; height: 60px; display: flex;
+            align-items: center; justify-content: space-between; border-bottom: 1px solid #e5e7eb; }
+  .topbar h2 { font-size: 18px; font-weight: 700; }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #e5e7eb; }
+  .status-dot.online { background: var(--green); box-shadow: 0 0 0 3px rgba(37,211,102,.25); }
+  .status-label { font-size: 13px; color: var(--muted); }
+  .content { flex: 1; padding: 28px; overflow-y: auto; }
+
+  /* ── Cards ── */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 28px; }
+  .stat-card { background: var(--white); border-radius: var(--radius); padding: 20px;
+               box-shadow: var(--shadow); }
+  .stat-card .label { font-size: 12px; color: var(--muted); text-transform: uppercase;
+                      letter-spacing: .05em; margin-bottom: 8px; }
+  .stat-card .value { font-size: 28px; font-weight: 800; color: var(--text); }
+  .stat-card .sub   { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .stat-card.green  { border-top: 3px solid var(--green); }
+  .stat-card.blue   { border-top: 3px solid var(--info); }
+  .stat-card.warn   { border-top: 3px solid var(--warn); }
+  .stat-card.danger { border-top: 3px solid var(--danger); }
+
+  /* ── Table ── */
+  .card { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 24px; }
+  .card-header { padding: 16px 20px; border-bottom: 1px solid #e5e7eb;
+                 display: flex; align-items: center; justify-content: space-between; }
+  .card-header h3 { font-size: 15px; font-weight: 700; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: #f9fafb; text-align: left; padding: 10px 16px; font-weight: 600;
+       color: var(--muted); text-transform: uppercase; font-size: 11px; letter-spacing: .05em; }
+  td { padding: 12px 16px; border-top: 1px solid #f3f4f6; vertical-align: top; }
+  tr:hover td { background: #fafafa; }
+
+  /* ── Badges ── */
+  .badge { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px;
+           font-size: 11px; font-weight: 600; }
+  .badge-new       { background: #eff6ff; color: #2563eb; }
+  .badge-contacted { background: #fef3c7; color: #92400e; }
+  .badge-converted { background: #f0fdf4; color: #15803d; }
+  .badge-lost      { background: #fef2f2; color: #dc2626; }
+  .badge-sent      { background: #f0fdf4; color: #15803d; }
+  .badge-draft     { background: #f3f4f6; color: #6b7280; }
+  .badge-scheduled { background: #fef3c7; color: #92400e; }
+
+  /* ── Forms ── */
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .form-group input, .form-group textarea, .form-group select {
+    width: 100%; padding: 10px 12px; border: 1.5px solid #e5e7eb; border-radius: 8px;
+    font-size: 14px; outline: none; transition: border .15s; font-family: inherit;
+  }
+  .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+    border-color: var(--green); }
+  .form-group textarea { resize: vertical; min-height: 100px; }
+  .char-count { font-size: 11px; color: var(--muted); text-align: right; margin-top: 4px; }
+
+  /* ── Buttons ── */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px;
+         border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
+         border: none; transition: all .15s; }
+  .btn-green  { background: var(--green); color: #fff; }
+  .btn-green:hover { background: var(--green-dark); }
+  .btn-outline { background: transparent; border: 1.5px solid #d1d5db; color: var(--text); }
+  .btn-outline:hover { border-color: var(--green); color: var(--green); }
+  .btn-sm { padding: 5px 12px; font-size: 12px; }
+  .btn-danger { background: var(--danger); color: #fff; }
+
+  /* ── Tabs ── */
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; }
+  .tab { padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px;
+         font-weight: 600; color: var(--muted); transition: all .15s; }
+  .tab.active { background: var(--white); color: var(--green); box-shadow: var(--shadow); }
+
+  /* ── Charts ── */
+  .chart-wrap { padding: 20px; }
+  .bar-chart { display: flex; align-items: flex-end; gap: 4px; height: 120px; }
+  .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .bar { width: 100%; background: var(--green-light); border-radius: 4px 4px 0 0;
+         transition: all .3s; cursor: default; }
+  .bar:hover { background: var(--green); }
+  .bar-label { font-size: 9px; color: var(--muted); }
+
+  /* ── Login ── */
+  .login-wrap { min-height: 100vh; display: flex; align-items: center;
+                justify-content: center; background: var(--bg); }
+  .login-card { background: var(--white); border-radius: var(--radius); padding: 40px;
+                width: 360px; box-shadow: var(--shadow); }
+  .login-card h2 { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+  .login-card p  { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+
+  /* ── Utils ── */
+  .flex { display: flex; }
+  .gap-2 { gap: 8px; }
+  .gap-3 { gap: 12px; }
+  .ml-auto { margin-left: auto; }
+  .empty { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
+  .tag { display: inline-block; background: var(--green-light); color: var(--green-dark);
+         padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+  .loading { text-align: center; padding: 40px; color: var(--muted); }
+  .toast { position: fixed; bottom: 24px; right: 24px; background: #1a1a2e; color: #fff;
+           padding: 12px 20px; border-radius: 10px; font-size: 14px; opacity: 0;
+           transition: opacity .3s; z-index: 999; }
+  .toast.show { opacity: 1; }
+  @media (max-width: 768px) {
+    .sidebar { display: none; }
+    .stat-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────
+//  State
+// ─────────────────────────────────────────────────────────────────────────
+const state = {
+  auth: null,       // { username, password }
+  page: 'dashboard',
+  data: {},
+  botStatus: false,
+};
+
+const API = '/api';
+
+// ─────────────────────────────────────────────────────────────────────────
+//  Utils
+// ─────────────────────────────────────────────────────────────────────────
+function toast(msg, ms = 3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), ms);
+}
+
+async function api(path, opts = {}) {
+  const creds = btoa(`${state.auth.username}:${state.auth.password}`);
+  const res = await fetch(API + path, {
+    ...opts,
+    headers: {
+      'Authorization': 'Basic ' + creds,
+      'Content-Type': 'application/json',
+      ...(opts.headers || {}),
+    },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleString('en-GH', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function fmtPhone(p) { return p ? p.replace('@c.us', '') : '—'; }
+
+// ─────────────────────────────────────────────────────────────────────────
+//  Render
+// ─────────────────────────────────────────────────────────────────────────
+function render() {
+  const app = document.getElementById('app');
+  if (!state.auth) { app.innerHTML = renderLogin(); bindLogin(); return; }
+  app.innerHTML = renderLayout();
+  bindNav();
+  renderPage();
+}
+
+function renderLogin() {
+  return `
+  <div class="login-wrap">
+    <div class="login-card">
+      <div style="font-size:40px;text-align:center;margin-bottom:16px">💬</div>
+      <h2 style="text-align:center">Bot Admin</h2>
+      <p style="text-align:center">Sign in to manage your WhatsApp bot</p>
+      <div class="form-group">
+        <label>Username</label>
+        <input id="login-user" type="text" value="admin" placeholder="admin"/>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input id="login-pass" type="password" placeholder="••••••"/>
+      </div>
+      <button class="btn btn-green" id="login-btn" style="width:100%;justify-content:center;padding:12px">
+        Sign In
+      </button>
+    </div>
+  </div>`;
+}
+
+function bindLogin() {
+  document.getElementById('login-btn').onclick = async () => {
+    const user = document.getElementById('login-user').value;
+    const pass = document.getElementById('login-pass').value;
+    state.auth = { username: user, password: pass };
+    try {
+      await api('/analytics');
+      render();
+    } catch {
+      state.auth = null;
+      toast('❌ Invalid credentials');
+    }
+  };
+  document.getElementById('login-pass').onkeydown = e => {
+    if (e.key === 'Enter') document.getElementById('login-btn').click();
+  };
+}
+
+const PAGES = [
+  { id: 'dashboard', icon: '📊', label: 'Dashboard' },
+  { id: 'leads',     icon: '🎯', label: 'Leads' },
+  { id: 'broadcast', icon: '📢', label: 'Broadcast' },
+  { id: 'users',     icon: '👥', label: 'Users' },
+  { id: 'messages',  icon: '💬', label: 'Messages' },
+];
+
+function renderLayout() {
+  return `
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <h1>💬 WA Bot Admin</h1>
+        <p>Control Panel</p>
+      </div>
+      <nav class="sidebar-nav">
+        ${PAGES.map(p => `
+          <div class="nav-item ${state.page === p.id ? 'active' : ''}" data-page="${p.id}">
+            <span class="nav-icon">${p.icon}</span>${p.label}
+          </div>
+        `).join('')}
+      </nav>
+      <div style="padding:16px 20px;font-size:12px;opacity:.6;border-top:1px solid rgba(255,255,255,.1)">
+        <div style="margin-bottom:4px">Bot Status</div>
+        <div class="flex gap-2" style="align-items:center">
+          <div class="status-dot ${state.botStatus ? 'online' : ''}"></div>
+          <span>${state.botStatus ? 'Online' : 'Offline'}</span>
+        </div>
+      </div>
+    </aside>
+    <div class="main">
+      <div class="topbar">
+        <h2>${PAGES.find(p => p.id === state.page)?.label || ''}</h2>
+        <div class="topbar-right">
+          <div class="status-dot ${state.botStatus ? 'online' : ''}"></div>
+          <span class="status-label">${state.botStatus ? 'Bot Online' : 'Bot Offline'}</span>
+          <button class="btn btn-outline btn-sm" id="logout-btn">Logout</button>
+        </div>
+      </div>
+      <div class="content" id="page-content">
+        <div class="loading">Loading…</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function bindNav() {
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.onclick = () => { state.page = el.dataset.page; render(); };
+  });
+  document.getElementById('logout-btn').onclick = () => {
+    state.auth = null; state.page = 'dashboard'; render();
+  };
+}
+
+async function renderPage() {
+  const el = document.getElementById('page-content');
+  try {
+    switch (state.page) {
+      case 'dashboard': await renderDashboard(el); break;
+      case 'leads':     await renderLeads(el);     break;
+      case 'broadcast': await renderBroadcast(el); break;
+      case 'users':     await renderUsers(el);     break;
+      case 'messages':  await renderMessages(el);  break;
+    }
+  } catch (e) {
+    el.innerHTML = `<div class="empty">⚠️ Failed to load data: ${e.message}</div>`;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+//  Dashboard
+// ─────────────────────────────────────────────────────────────────────────
+async function renderDashboard(el) {
+  const data = await api('/analytics');
+  const daily = await api('/analytics/daily');
+
+  const maxBar = Math.max(...daily.daily.map(d => d.total), 1);
+
+  el.innerHTML = `
+  <div class="stat-grid">
+    <div class="stat-card green">
+      <div class="label">Total Users</div>
+      <div class="value">${data.totalUsers}</div>
+      <div class="sub">All time subscribers</div>
+    </div>
+    <div class="stat-card blue">
+      <div class="label">Total Leads</div>
+      <div class="value">${data.totalLeads}</div>
+      <div class="sub">${data.newLeads} new</div>
+    </div>
+    <div class="stat-card warn">
+      <div class="label">Messages In</div>
+      <div class="value">${data.msgIn}</div>
+      <div class="sub">Inbound messages</div>
+    </div>
+    <div class="stat-card danger">
+      <div class="label">Messages Out</div>
+      <div class="value">${data.msgOut}</div>
+      <div class="sub">${data.broadcasts} broadcasts</div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div class="card">
+      <div class="card-header"><h3>📈 Daily Activity (30 days)</h3></div>
+      <div class="chart-wrap">
+        <div class="bar-chart">
+          ${daily.daily.slice(-20).map(d => `
+            <div class="bar-col" title="${d.date}: ${d.total} messages">
+              <div class="bar" style="height:${Math.round((d.total/maxBar)*100)}px"></div>
+              <div class="bar-label">${d.date.slice(5)}</div>
+            </div>
+          `).join('') || '<div class="empty">No data yet</div>'}
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h3>🎯 Recent Leads</h3></div>
+      ${data.recentLeads.length ? `
+      <table>
+        <thead><tr><th>Name</th><th>Service</th><th>Status</th></tr></thead>
+        <tbody>
+          ${data.recentLeads.map(l => `
+          <tr>
+            <td><strong>${l.name || 'Unknown'}</strong><br><small style="color:var(--muted)">${fmtPhone(l.phone)}</small></td>
+            <td>${l.service || '—'}</td>
+            <td><span class="badge badge-${l.status}">${l.status}</span></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>` : '<div class="empty">No leads yet</div>'}
+    </div>
+  </div>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+//  Leads
+// ─────────────────────────────────────────────────────────────────────────
+async function renderLeads(el) {
+  const { leads } = await api('/leads?limit=100');
+
+  el.innerHTML = `
+  <div class="flex gap-2" style="margin-bottom:16px">
+    <div class="tabs">
+      ${['all','new','contacted','converted','lost'].map(s => `
+        <div class="tab ${s === 'all' ? 'active' : ''}" data-filter="${s}">${s.charAt(0).toUpperCase()+s.slice(1)}</div>
+      `).join('')}
+    </div>
+    <div class="ml-auto">
+      <a href="/api/leads/export" class="btn btn-outline btn-sm">⬇ Export CSV</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3>All Leads <span class="tag">${leads.length}</span></h3>
+    </div>
+    ${leads.length ? `
+    <table id="leads-table">
+      <thead><tr><th>#</th><th>Name</th><th>Service</th><th>Budget</th><th>Timeline</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+      <tbody>
+        ${leads.map(l => `
+        <tr data-status="${l.status}">
+          <td>${l.id}</td>
+          <td><strong>${l.name || 'Unknown'}</strong><br><small style="color:var(--muted)">${fmtPhone(l.phone)}</small></td>
+          <td>${l.service || '—'}</td>
+          <td>${l.budget || '—'}</td>
+          <td>${l.timeline || '—'}</td>
+          <td><span class="badge badge-${l.status}">${l.status}</span></td>
+          <td style="white-space:nowrap;font-size:12px;color:var(--muted)">${fmtDate(l.created_at)}</td>
+          <td>
+            <select class="lead-status-sel" data-id="${l.id}" style="font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid #e5e7eb">
+              ${['new','contacted','converted','lost'].map(s => `<option value="${s}" ${l.status===s?'selected':''}>${s}</option>`).join('')}
+            </select>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>` : '<div class="empty">No leads yet. They will appear here when users interact with the bot.</div>'}
+  </div>`;
+
+  // Filter tabs
+  el.querySelectorAll('.tab').forEach(tab => {
+    tab.onclick = () => {
+      el.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const f = tab.dataset.filter;
+      el.querySelectorAll('#leads-table tbody tr').forEach(row => {
+        row.style.display = (f === 'all' || row.dataset.status === f) ? '' : 'none';
+      });
+    };
+  });
+
+  // Status change
+  el.querySelectorAll('.lead-status-sel').forEach(sel => {
+    sel.onchange = async () => {
+      try {
+        await api(`/leads/${sel.dataset.id}/status`, { method: 'PATCH', body: { status: sel.value } });
+        toast(`✅ Status updated to "${sel.value}"`);
+        // Update badge
+        const row = sel.closest('tr');
+        row.dataset.status = sel.value;
+        row.querySelector('.badge').className = `badge badge-${sel.value}`;
+        row.querySelector('.badge').textContent = sel.value;
+      } catch { toast('❌ Update failed'); }
+    };
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+//  Broadcast
+// ─────────────────────────────────────────────────────────────────────────
+async function renderBroadcast(el) {
+  const { broadcasts } = await api('/broadcasts');
+
+  el.innerHTML = `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+    <div class="card" style="padding:20px">
+      <div class="card-header" style="padding:0 0 16px 0;border:none"><h3>📤 New Broadcast</h3></div>
+      <div class="form-group">
+        <label>Title (internal)</label>
+        <input id="bc-title" type="text" placeholder="e.g. Weekly Newsletter"/>
+      </div>
+      <div class="form-group">
+        <label>Message</label>
+        <textarea id="bc-msg" placeholder="Type your message here…" oninput="document.getElementById('bc-count').textContent=this.value.length+' chars'"></textarea>
+        <div class="char-count" id="bc-count">0 chars</div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-green" id="bc-send-now">🚀 Send Now</button>
+        <button class="btn btn-outline" id="bc-save-draft">💾 Save Draft</button>
+      </div>
+      <div id="bc-result" style="margin-top:12px;font-size:13px;color:var(--muted)"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h3>📋 Broadcast History <span class="tag">${broadcasts.length}</span></h3></div>
+      ${broadcasts.length ? `
+      <table>
+        <thead><tr><th>Title</th><th>Delivered</th><th>Failed</th><th>Status</th><th>Date</th></tr></thead>
+        <tbody>
+          ${broadcasts.map(b => `
+          <tr>
+            <td><strong>${b.title || 'Untitled'}</strong></td>
+            <td style="color:var(--green);font-weight:600">${b.delivered}</td>
+            <td style="color:var(--danger);font-weight:600">${b.failed}</td>
+            <td><span class="badge badge-${b.status}">${b.status}</span></td>
+            <td style="font-size:12px;color:var(--muted)">${fmtDate(b.created_at)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>` : '<div class="empty">No broadcasts yet</div>'}
+    </div>
+  </div>`;
+
+  document.getElementById('bc-send-now').onclick = async () => {
+    const msg = document.getElementById('bc-msg').value.trim();
+    const title = document.getElementById('bc-title').value.trim() || 'Manual Broadcast';
+    if (!msg) { toast('⚠️ Message is required'); return; }
+    document.getElementById('bc-result').textContent = '⏳ Sending broadcast…';
+    try {
+      await api('/broadcast', { method: 'POST', body: { title, message: msg, sendNow: true } });
+      toast('📢 Broadcast queued! Check history for results.');
+      document.getElementById('bc-msg').value = '';
+      document.getElementById('bc-title').value = '';
+      document.getElementById('bc-result').textContent = '✅ Broadcast is sending in the background.';
+    } catch (e) { document.getElementById('bc-result').textContent = '❌ Error: ' + e.message; }
+  };
+
+  document.getElementById('bc-save-draft').onclick = async () => {
+    const msg = document.getElementById('bc-msg').value.trim();
+    const title = document.getElementById('bc-title').value.trim() || 'Draft';
+    if (!msg) { toast('⚠️ Message is required'); return; }
+    try {
+      await api('/broadcast', { method: 'POST', body: { title, message: msg, sendNow: false } });
+      toast('💾 Draft saved!');
+      renderBroadcast(el);
+    } catch (e) { toast('❌ ' + e.message); }
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+//  Users
+// ─────────────────────────────────────────────────────────────────────────
+async function renderUsers(el) {
+  const { users } = await api('/analytics/users');
+
+  el.innerHTML = `
+  <div class="card">
+    <div class="card-header">
+      <h3>All Users <span class="tag">${users.length}</span></h3>
+    </div>
+    ${users.length ? `
+    <table>
+      <thead><tr><th>Phone</th><th>Name</th><th>Subscribed</th><th>Blocked</th><th>Joined</th><th>Last Seen</th></tr></thead>
+      <tbody>
+        ${users.map(u => `
+        <tr>
+          <td><strong>${fmtPhone(u.phone)}</strong></td>
+          <td>${u.name || '<span style="color:var(--muted)">Unknown</span>'}</td>
+          <td>${u.is_subscribed ? '✅' : '❌'}</td>
+          <td>${u.is_blocked ? '🚫' : '—'}</td>
+          <td style="font-size:12px;color:var(--muted)">${fmtDate(u.joined_at)}</td>
+          <td style="font-size:12px;color:var(--muted)">${fmtDate(u.last_seen)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>` : '<div class="empty">No users yet. They appear when they message the bot.</div>'}
+  </div>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+//  Messages
+// ─────────────────────────────────────────────────────────────────────────
+async function renderMessages(el) {
+  const { messages } = await api('/analytics/messages');
+
+  el.innerHTML = `
+  <div class="card">
+    <div class="card-header">
+      <h3>Message Log <span class="tag">${messages.length}</span></h3>
+    </div>
+    ${messages.length ? `
+    <table>
+      <thead><tr><th>Phone</th><th>Direction</th><th>Message</th><th>Status</th><th>Time</th></tr></thead>
+      <tbody>
+        ${messages.map(m => `
+        <tr>
+          <td>${fmtPhone(m.phone)}</td>
+          <td>
+            <span class="badge ${m.direction==='inbound' ? 'badge-new' : 'badge-converted'}">
+              ${m.direction === 'inbound' ? '⬇ In' : '⬆ Out'}
+            </span>
+          </td>
+          <td style="max-width:300px;word-break:break-word;font-size:13px">${m.message || '—'}</td>
+          <td><span class="badge badge-${m.status}">${m.status}</span></td>
+          <td style="font-size:12px;color:var(--muted);white-space:nowrap">${fmtDate(m.created_at)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>` : '<div class="empty">No messages logged yet.</div>'}
+  </div>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+//  Boot
+// ─────────────────────────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>

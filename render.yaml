@@ -1,0 +1,57 @@
+services:
+  - type: web
+    name: newbot
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # ── Required ──────────────────────────────────────────────────
+      - key: DATABASE_URL
+        sync: false        # Set manually in Render dashboard
+
+      - key: BUSINESS_NAME
+        sync: false
+
+      - key: ADMIN_PHONE
+        sync: false
+
+      - key: ADMIN_PASSWORD
+        sync: false
+
+      # ── Grok AI ───────────────────────────────────────────────────
+      - key: GROK_API_KEY
+        sync: false        # Get from https://console.x.ai
+
+      - key: GROK_MODEL
+        value: grok-3
+
+      # ── Chrome / Puppeteer ────────────────────────────────────────
+      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
+        value: "true"
+
+      - key: PUPPETEER_EXECUTABLE_PATH
+        value: /usr/bin/chromium
+
+      # ── App ───────────────────────────────────────────────────────
+      - key: NODE_ENV
+        value: production
+
+      - key: ADMIN_USERNAME
+        value: admin
+
+      - key: ADMIN_PORT
+        value: "3001"
+
+      - key: SESSION_NAME
+        value: whatsapp-bot
+
+      - key: SESSION_FOLDER
+        value: ./tokens
+
+      - key: RATE_LIMIT_PER_HOUR
+        value: "10"
+
+      - key: LOG_LEVEL
+        value: info
