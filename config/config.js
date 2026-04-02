@@ -1,13 +1,5 @@
-require('dotenv').config();
-
-// ── Database: Neon PostgreSQL ONLY ─────────────────────────────────────
-if (!process.env.DATABASE_URL) {
-  console.error('❌ DATABASE_URL is required. Set your Neon connection string.');
-  process.exit(1);
-}
-if (!process.env.DATABASE_URL.includes('neon.tech')) {
-  console.warn('⚠️  DATABASE_URL does not look like a Neon connection string.');
-}
+// config.js — pure config export, NO dotenv here, NO process.exit
+// All env loading and validation happens in src/index.js ONLY
 
 module.exports = {
   business: {
@@ -16,15 +8,15 @@ module.exports = {
     adminSecret: process.env.ADMIN_SECRET   || 'changeme123',
   },
 
-  // ── Neon PostgreSQL — forced, no SQLite fallback ───────────────────
+  // ── Neon PostgreSQL ────────────────────────────────────────────────
   db: {
-    url: process.env.DATABASE_URL,
+    url: process.env.DATABASE_URL || '',
   },
 
-  // ── Grok (xAI) — forced, no OpenAI fallback ───────────────────────
+  // ── Grok / xAI ────────────────────────────────────────────────────
   grok: {
-    apiKey:  process.env.GROK_API_KEY  || '',
-    model:   process.env.GROK_MODEL    || 'grok-3',
+    apiKey:  process.env.GROK_API_KEY || '',
+    model:   process.env.GROK_MODEL   || 'grok-3',
     enabled: !!process.env.GROK_API_KEY,
   },
 
@@ -64,7 +56,7 @@ module.exports = {
 
   // ── Keyword Auto-Replies ───────────────────────────────────────────
   keywords: {
-    price:    `💰 *Our Pricing*\n\nWeb Development: from GHS 2,000\nGraphic Design: from GHS 500\nEvent Booking: from GHS 800\n\nReply with your service of interest for a custom quote! 😊`,
+    price:    `💰 *Our Pricing*\n\nWeb Development: from GHS 2,000\nGraphic Design: from GHS 500\nEvent Booking: from GHS 800\n\nReply with your service interest for a custom quote! 😊`,
     services: `🛠️ *Our Services*\n\n1️⃣ Web Development\n2️⃣ Graphic Design\n3️⃣ Event Booking\n\nType *menu* to get started.`,
     hours:    `🕐 *Business Hours*\n\nMon–Fri: 8am – 6pm\nSat: 9am – 3pm\nSun: Closed\n\nWe reply within 1 hour! 😊`,
     hello:    null,

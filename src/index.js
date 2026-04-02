@@ -1,4 +1,24 @@
+// ── Load .env FIRST before anything else ─────────────────────────────
 require('dotenv').config();
+
+// ── Validate required env vars immediately after dotenv ───────────────
+const REQUIRED = {
+  DATABASE_URL: process.env.DATABASE_URL,
+};
+
+const missing = Object.entries(REQUIRED)
+  .filter(([, v]) => !v)
+  .map(([k]) => k);
+
+if (missing.length) {
+  console.error('\n❌ Missing required environment variables:');
+  missing.forEach(k => console.error(`   → ${k} is not set`));
+  console.error('\nFor local dev: create a .env file in the project root.');
+  console.error('For Render: set it in Dashboard → NewBot → Environment.\n');
+  process.exit(1);
+}
+
+// ── Now safe to load everything else ─────────────────────────────────
 const venom  = require('venom-bot');
 const cron   = require('node-cron');
 const fs     = require('fs');
@@ -13,87 +33,96 @@ const { runDrip }           = require('./services/dripService');
 const { followUpAbandoned } = require('./bot/flows/leadFlow');
 const { startAdminServer }  = require('./admin/server');
 
-// ── Detect Render environment ─────────────────────────────────────────
-const IS_RENDER = !!process.env.RENDER;
+// ── Environment detection ─────────────────────────────────────────────
+const IS_RENDER   = !!process.env.RENDER;
 const CHROME_PATH = process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium';
+const PORT        = parseInt(process.env.PORT) || 10000;
 
-// Ensure folders exist
+// ── Ensure runtime folders exist ─────────────────────────────────────
 [config.session.folder, './logs'].forEach(dir => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
-if (!config.db.url) {
-  logger.error('❌ DATABASE_URL is not set!');
-  logger.error('   Add it in Render → Your Service → Environment Variables');
-  process.exit(1);
-}
+// ── Global bot state ──────────────────────────────────────────────────
+let currentQR    = null;
+let botConnected = false;
+let botClient    = null;
 
-// ── Global state ──────────────────────────────────────────────────────
-let currentQR     = null;
-let botConnected  = false;
-let botClient     = null;
-
-// ── Minimal health-check HTTP server ─────────────────────────────────
-// Render requires a web server to confirm deployment is live.
-// This runs on PORT env var (set by Render automatically).
-const PORT = process.env.PORT || config.admin.port || 3001;
-
+// ── Health + QR HTTP server ───────────────────────────────────────────
+// Render requires something listening on PORT to confirm deploy is live
 const healthServer = http.createServer((req, res) => {
-  if (req.url === '/health') {
+  const url = req.url.split('?')[0];
+
+  if (url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'ok', connected: botConnected }));
-    return;
+    return res.end(JSON.stringify({
+      status: 'ok',
+      connected: botConnected,
+      timestamp: new Date().toISOString(),
+    }));
   }
 
-  // QR code page — visit this URL in browser after deploy to scan QR
-  if (req.url === '/qr') {
-    if (!currentQR) {
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(`<html><body style="font-family:sans-serif;padding:40px">
-        <h2>${botConnected ? '✅ Bot Connected!' : '⏳ Waiting for QR code...'}</h2>
-        <p>${botConnected ? 'WhatsApp is linked and the bot is running.' : 'Refresh in a few seconds...'}</p>
-        <script>if(!${botConnected}) setTimeout(()=>location.reload(), 3000);</script>
-      </body></html>`);
-      return;
-    }
-    // Show QR as scannable image in browser
+  if (url === '/qr') {
     res.writeHead(200, { 'Content-Type': 'text/html' });
-    res.end(`<html><body style="font-family:sans-serif;padding:40px;text-align:center">
-      <h2>📱 Scan this QR code with WhatsApp</h2>
-      <p>WhatsApp → Settings → Linked Devices → Link a Device</p>
-      <img src="${currentQR}" style="max-width:300px;border:1px solid #ccc;padding:10px;border-radius:8px"/>
-      <p><small>Page auto-refreshes every 5 seconds</small></p>
-      <script>setTimeout(()=>location.reload(), 5000);</script>
+    if (botConnected) {
+      return res.end(`<!DOCTYPE html><html><head><title>Bot Status</title>
+        <meta http-equiv="refresh" content="10">
+        <style>body{font-family:sans-serif;padding:40px;text-align:center}</style>
+      </head><body>
+        <h2>✅ WhatsApp Bot Connected!</h2>
+        <p>The bot is running and ready to receive messages.</p>
+        <p style="color:#888;font-size:13px">Auto-refreshes every 10s</p>
+      </body></html>`);
+    }
+    if (!currentQR) {
+      return res.end(`<!DOCTYPE html><html><head><title>Bot QR</title>
+        <meta http-equiv="refresh" content="3">
+        <style>body{font-family:sans-serif;padding:40px;text-align:center}</style>
+      </head><body>
+        <h2>⏳ Starting up...</h2>
+        <p>WhatsApp QR code is loading. This page will refresh automatically.</p>
+        <p style="color:#888;font-size:13px">If this takes more than 2 minutes, check the Render logs.</p>
+      </body></html>`);
+    }
+    return res.end(`<!DOCTYPE html><html><head><title>Scan QR</title>
+      <meta http-equiv="refresh" content="5">
+      <style>body{font-family:sans-serif;padding:40px;text-align:center}
+        img{border:2px solid #25d366;border-radius:12px;padding:12px;max-width:280px}</style>
+    </head><body>
+      <h2>📱 Scan with WhatsApp</h2>
+      <p>WhatsApp → ⋮ Menu → Linked Devices → Link a Device</p>
+      <img src="${currentQR}" alt="QR Code"/>
+      <p style="color:#888;font-size:13px">Page auto-refreshes every 5 seconds</p>
     </body></html>`);
-    return;
   }
 
-  // Root — redirect to QR
+  // All other routes → redirect to /qr
   res.writeHead(302, { Location: '/qr' });
   res.end();
 });
 
-healthServer.listen(PORT, () => {
-  logger.info(`🌐 Health server running on port ${PORT}`);
-  logger.info(`   → Visit /qr to scan the WhatsApp QR code`);
+healthServer.listen(PORT, '0.0.0.0', () => {
+  logger.info(`🌐 Server listening on port ${PORT}`);
+  if (IS_RENDER) {
+    logger.info(`   QR page → https://${process.env.RENDER_EXTERNAL_HOSTNAME}/qr`);
+  } else {
+    logger.info(`   QR page → http://localhost:${PORT}/qr`);
+  }
 });
 
-// ── Main ──────────────────────────────────────────────────────────────
+// ── Main bot startup ──────────────────────────────────────────────────
 async function main() {
   logger.info('🔌 Connecting to Neon PostgreSQL...');
   await db.initDB();
+  logger.info('✅ Database ready');
 
   logger.info(`🚀 Starting ${config.business.name} WhatsApp Bot...`);
-  if (IS_RENDER) {
-    logger.info(`🖥  Running on Render — Chrome path: ${CHROME_PATH}`);
-  }
 
-  // Venom-Bot options — tuned for server/cloud environments
   const venomOptions = {
     folderNameToken: config.session.folder,
     headless: true,
-    logQR: false,            // We handle QR ourselves via /qr endpoint
-    autoClose: 0,            // Never auto-close on server
+    logQR: false,
+    autoClose: 0,
     disableWelcome: true,
     updatesLog: false,
     browserArgs: [
@@ -111,32 +140,33 @@ async function main() {
       '--disable-sync',
       '--disable-translate',
       '--hide-scrollbars',
-      '--metrics-recording-only',
       '--mute-audio',
       '--safebrowsing-disable-auto-update',
     ],
-    // Use system Chromium on Render, default elsewhere
-    ...(IS_RENDER && {
+    // Use system Chromium when running in Docker / Render
+    ...(IS_RENDER || process.env.PUPPETEER_EXECUTABLE_PATH ? {
       executablePath: CHROME_PATH,
-    }),
+    } : {}),
   };
 
   const client = await venom.create(
     config.session.name,
+    // QR callback
     (base64Qr) => {
-      currentQR = base64Qr;
+      currentQR    = base64Qr;
       botConnected = false;
-      const qrUrl = IS_RENDER
+      const qrUrl  = IS_RENDER
         ? `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/qr`
         : `http://localhost:${PORT}/qr`;
-      logger.info(`📱 QR ready! Open this URL to scan: ${qrUrl}`);
+      logger.info(`📱 QR ready → open in browser to scan: ${qrUrl}`);
     },
+    // Status callback
     (statusSession) => {
-      logger.info('Session status: ' + statusSession);
+      logger.info(`Session: ${statusSession}`);
       if (['isLogged', 'qrReadSuccess', 'chatsAvailable'].includes(statusSession)) {
         botConnected = true;
-        currentQR = null;
-        logger.info('✅ WhatsApp connected!');
+        currentQR    = null;
+        logger.info('✅ WhatsApp connected and ready!');
       }
       if (['notLogged', 'browserClose', 'qrReadFail'].includes(statusSession)) {
         botConnected = false;
@@ -147,14 +177,13 @@ async function main() {
 
   botClient = client;
 
-  // Wire message handler
+  // ── Message routing ───────────────────────────────────────────────
   client.onMessage((msg) => handleMessage(client, msg));
 
-  // ── Cron jobs ──────────────────────────────────────────────────────
-
+  // ── Cron jobs ─────────────────────────────────────────────────────
   cron.schedule('0 * * * *', async () => {
     if (!botConnected) return;
-    logger.info('⏰ Running drip campaign check...');
+    logger.info('⏰ Running drip campaigns...');
     await runDrip(client);
   });
 
@@ -176,36 +205,36 @@ async function main() {
     logger.info('🧹 Cleaned rate limit records');
   });
 
-  // ── Admin dashboard (separate Express server) ──────────────────────
+  // ── Admin dashboard ───────────────────────────────────────────────
   startAdminServer(client);
-
-  const externalUrl = IS_RENDER
-    ? `https://${process.env.RENDER_EXTERNAL_HOSTNAME}`
-    : `http://localhost:${PORT}`;
 
   logger.info(`
   ╔══════════════════════════════════════════════╗
-  ║   WhatsApp Bot is running! 🎉                 ║
-  ║                                              ║
-  ║   QR Scan → ${externalUrl}/qr
-  ║   Health  → ${externalUrl}/health
-  ║   Admin   → ${externalUrl.replace(PORT, config.admin.port)}
-  ║   DB      → Neon PostgreSQL ☁️                ║
+  ║        WhatsApp Bot is running! 🎉            ║
+  ╠══════════════════════════════════════════════╣
+  ║  QR / Status → /qr                           ║
+  ║  Health      → /health                       ║
+  ║  DB          → Neon PostgreSQL ☁️             ║
+  ║  AI          → Grok (xAI)                    ║
   ╚══════════════════════════════════════════════╝
   `);
 }
 
 main().catch((err) => {
-  logger.error('❌ Fatal startup error: ' + err.message);
+  logger.error('❌ Fatal error: ' + err.message);
   logger.error(err.stack);
-  // Don't exit immediately — let health server stay up so Render doesn't loop-restart
-  setTimeout(() => process.exit(1), 5000);
+  // Keep health server alive briefly so Render can read the logs
+  setTimeout(() => process.exit(1), 8000);
 });
 
-// Handle graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received — shutting down gracefully');
-  if (botClient) botClient.close();
+// ── Graceful shutdown ─────────────────────────────────────────────────
+process.on('SIGTERM', async () => {
+  logger.info('Shutting down gracefully...');
+  if (botClient) await botClient.close().catch(() => {});
   healthServer.close();
   process.exit(0);
+});
+
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled rejection: ' + reason);
 });
