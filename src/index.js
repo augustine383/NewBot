@@ -38,6 +38,9 @@ function wipeSession() {
     // Also wipe venom's own session files
     const sessionFile = path.join(VENOM_TOKEN_DIR, 'newbot-session.data.json');
     if (fs.existsSync(sessionFile)) fs.unlinkSync(sessionFile);
+      const sessionName = process.env.SESSION_NAME || 'cyber-tech-bot';
+    const lockFile = require('path').join(VENOM_TOKEN_DIR, sessionName, 'SingletonLock');
+    try { require('fs').unlinkSync(lockFile); } catch(_) {}
   } catch (e) { /* ignore */ }
 }
 
